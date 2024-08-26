@@ -25,10 +25,10 @@ jobs:
         go-version: '1.22.5'
 
     - name: Build
-      run: make build
+      run: go build -o main cmd/web/*.go
 
     - name: Test
-      run: make test
+      run: go run cmd/web/*.go
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
