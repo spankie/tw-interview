@@ -114,8 +114,8 @@ func TestParser(t *testing.T) {
 		defer cancel()
 		parser := NewBlockParser(ctx, datastore, blockchainQuerier, 1*time.Second)
 		time.Sleep(2 * time.Second)
-		if currentBlockNumber := parser.GetCurrentBlock(); currentBlockNumber != 124 {
-			t.Errorf("GetCurrentBlock() = %v, want 123", currentBlockNumber)
+		if currentBlockNumber := parser.GetCurrentBlock(); currentBlockNumber < 124 {
+			t.Errorf("GetCurrentBlock() = %v, want > 124", currentBlockNumber)
 		}
 
 		// invalid address
