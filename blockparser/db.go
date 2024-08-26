@@ -2,7 +2,6 @@ package blockparser
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -12,11 +11,13 @@ var InvalidKeyError = fmt.Errorf("invalid key")
 // TODO: make the value type an interface that can be validated
 type memoryStore[T any] struct {
 	mu sync.RWMutex
-	// NOTE: sync.Map is not used because....
+
+	// NOTE: sync.Map is not used because from the documentation,
+	// this usecase does not require it
 	data map[string][]T
 }
 
-func NewMemoryDataStore[T any]() *memoryStore[T] {
+func newMemoryDataStore[T any]() *memoryStore[T] {
 	return &memoryStore[T]{
 		data: make(map[string][]T),
 	}
@@ -44,11 +45,4 @@ func (s *memoryStore[T]) Get(key string) ([]T, bool) {
 
 	item, ok := s.data[key]
 	return item, ok
-}
-
-// TODO: remove this or rename it to something useful
-func (s *memoryStore[T]) printData() {
-	for i, v := range s.data {
-		log.Printf("addr %s:\n----------\n%v\n----------", i, len(v))
-	}
 }

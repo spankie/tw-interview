@@ -7,14 +7,14 @@ import (
 )
 
 func TestNewDataStore(t *testing.T) {
-	store := NewMemoryDataStore[blockchain.Transaction]()
+	store := newMemoryDataStore[blockchain.Transaction]()
 	if store == nil {
 		t.Errorf("NewDataStore() = nil, want non-nil")
 	}
 }
 
 func TestSetAndGet(t *testing.T) {
-	store := NewMemoryDataStore[blockchain.Transaction]()
+	store := newMemoryDataStore[blockchain.Transaction]()
 
 	transactions := []blockchain.Transaction{
 		{
