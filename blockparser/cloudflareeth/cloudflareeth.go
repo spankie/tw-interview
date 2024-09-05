@@ -7,28 +7,39 @@ import (
 	"github.com/spankie/tw-interview/blockparser/blockchain"
 )
 
-var (
-	ErrInvalidBlockResponse = errors.New("invalid block response")
-)
+var ErrInvalidBlockResponse = errors.New("invalid block response")
 
 const (
 	ethBlockNumberMethod      = "eth_blockNumber"
 	ethGetBlockByNumberMethod = "eth_getBlockByNumber"
-
-	cloudFlareBaseURL = "https://cloudflare-eth.com"
 )
 
+type requester interface {
+	Post(url string, body rpcRequestBody, res any) error
+}
+
 type Client struct {
-	client         httpClient
+	client         requester
 	jsonRPCVersion string
 }
 
-// NewCloudflareEthClient creates a new cloudflare eth client.
-func NewCloudflareEthClient() *Client {
+// newClientFromConfig creates a new cloudflare eth client from a config.
+func newClientFromConfig(cfg Config) *Client {
 	return &Client{
-		client:         newHTTPClient(cloudFlareBaseURL),
+		client:         cfg.requester,
 		jsonRPCVersion: "2.0",
 	}
+}
+
+// NewClient creates a new cloudflare eth client from config options.
+func NewClient(cfgOpts ...ConfigOptionResolver) *Client {
+	cfg := LoadDefaultConfig()
+
+	for _, opt := range cfgOpts {
+		opt(&cfg)
+	}
+
+	return newClientFromConfig(cfg)
 }
 
 func (c Client) GetLatestBlock() (string, error) {

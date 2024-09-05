@@ -8,7 +8,6 @@ import (
 
 var ErrInvalidKey = errors.New("invalid key")
 
-// TODO: make the value type an interface that can be validated.
 type memoryStore[T any] struct {
 	mu sync.RWMutex
 

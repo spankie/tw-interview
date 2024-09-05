@@ -75,10 +75,12 @@ func main() {
 		log.Fatalf("could not configure logger: %v", err)
 	}
 
+	blockParser := blockparser.NewBlockParser()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	apiServer := newServer(blockparser.NewBlockParser(ctx, nil, nil, 1*time.Minute))
+	blockParser.StartBlockScanning(ctx)
 
-	run(ctx, apiServer)
+	run(ctx, newServer(blockParser))
 }

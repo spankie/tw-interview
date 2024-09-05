@@ -25,7 +25,7 @@ linters:
     - unparam
     - revive
     - cyclop
-    - exportloopref
+    - copyloopvar
     - usestdlibvars
     - unconvert
     - thelper

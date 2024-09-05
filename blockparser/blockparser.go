@@ -3,18 +3,20 @@ package blockparser
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/spankie/tw-interview/blockparser/blockchain"
-	"github.com/spankie/tw-interview/blockparser/cloudflareeth"
 )
 
-const (
-	defaultScanningInterval = 1 * time.Minute
-)
+// Logger is an interface for logging.
+type Logger interface {
+	Error(msg string, args ...any)
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+}
 
 // DataStore is an interface for storing data and querying data.
 type DataStore interface {
@@ -39,51 +41,58 @@ type BlockParser interface {
 	GetTransactions(address string) []blockchain.Transaction
 }
 
-type parser struct {
+type Parser struct {
 	// NOTE: using atomic int64 for thread safety
 	lastScannedBlock  atomic.Int64
 	datastore         DataStore
 	blockchainQuerier BlockchainQuerier
 	scanningInterval  time.Duration
+	logger            Logger
 }
 
 // NewBlockParser creates a new parser and starts the block transactions scanning.
-// TODO: probably need to use function options to set the neccessary dependencies
-// TODO: add logger for better logging control.
-func NewBlockParser(ctx context.Context, datastore DataStore,
-	blockchainQuerier BlockchainQuerier, scanningInterval time.Duration) BlockParser {
+// the returned parser must be used to start scanning for transactions by calling `parser.StartBlockScanning(ctx)`.
+func NewBlockParser(cfgOpts ...ConfigOptionResolver) *Parser {
+	cfg := Config{}
 
-	newParser := &parser{
-		datastore:         datastore,
-		scanningInterval:  scanningInterval,
-		blockchainQuerier: blockchainQuerier,
+	for _, opt := range cfgOpts {
+		opt(&cfg)
 	}
 
-	newParser.setDefaultOptions()
+	LoadDefaultConfig(&cfg)
 
-	go newParser.startBlockScanning(ctx)
+	return newBlockParserWithConfig(cfg)
+}
 
-	return newParser
+func newBlockParserWithConfig(cfg Config) *Parser {
+	parser := &Parser{
+		datastore:         cfg.datastore,
+		scanningInterval:  cfg.scanningInterval,
+		blockchainQuerier: cfg.blockchainQuerier,
+		logger:            cfg.logger,
+	}
+
+	return parser
 }
 
 // last parsed block.
-func (p *parser) GetCurrentBlock() int {
+func (p *Parser) GetCurrentBlock() int {
 	return int(p.lastScannedBlock.Load())
 }
 
 // add address to observer.
-func (p *parser) Subscribe(address string) bool {
+func (p *Parser) Subscribe(address string) bool {
 	if !isValidEthereumAddress(address) {
 		return false
 	}
 
-	// check if the address is already subscribed (already in the db)
+	// check if the address is already subscribed (already in the db).
 	if _, ok := p.datastore.Get(address); ok {
 		return false
 	}
 
 	// if the address is not in the db, add it so it can be observed when
-	// scanning the blockchain
+	// scanning the blockchain.
 	if err := p.datastore.Add(address, []blockchain.Transaction{}); err != nil {
 		return false
 	}
@@ -92,26 +101,44 @@ func (p *parser) Subscribe(address string) bool {
 }
 
 // list of inbound or outbound transactions for an address.
-func (p *parser) GetTransactions(address string) []blockchain.Transaction {
+func (p *Parser) GetTransactions(address string) []blockchain.Transaction {
 	transactions, _ := p.datastore.Get(address)
 	return transactions
 }
 
-func (p *parser) setDefaultOptions() {
-	if p.datastore == nil {
-		p.datastore = newMemoryDataStore[blockchain.Transaction]()
+// StartBlockScanning runs a task every minute to find inbound/outbound
+// transactions for subscribed address.
+func (p *Parser) StartBlockScanning(ctx context.Context) { //nolint: contextcheck
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	if p.blockchainQuerier == nil {
-		p.blockchainQuerier = cloudflareeth.NewCloudflareEthClient()
+	err := p.initScannedBlockNumber()
+	if err != nil {
+		p.logger.Error(fmt.Sprintf("could not start block scanning: %v", err))
+		return
 	}
 
 	if p.scanningInterval == 0 {
 		p.scanningInterval = defaultScanningInterval
 	}
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				p.logger.Info("block scanning stopped")
+				return
+			default:
+				time.Sleep(p.scanningInterval)
+				p.querySubscribedAddressTransactions(ctx)
+			}
+		}
+	}()
 }
 
-func (p *parser) getLatestBlock() (int64, error) {
+// getLatestBlockNumber fetches the latest block number from the blockchain.
+func (p *Parser) getLatestBlockNumber() (int64, error) {
 	blockNumberStr, err := p.blockchainQuerier.GetLatestBlock()
 	if err != nil {
 		return 0, fmt.Errorf("error fetching latest block: %w", err)
@@ -120,9 +147,11 @@ func (p *parser) getLatestBlock() (int64, error) {
 	return blockchain.ConvertHexToInt(blockNumberStr), nil
 }
 
-// start scanning from the latest block.
-func (p *parser) initScannedBlock() error {
-	blockNumber, err := p.getLatestBlock()
+// initScannedBlockNumber initializes the last scanned block with the current block number.
+// this is done when the parser is started to ensure that the parser starts scanning
+// from the latest block.
+func (p *Parser) initScannedBlockNumber() error {
+	blockNumber, err := p.getLatestBlockNumber()
 	if err != nil {
 		return err
 	}
@@ -136,17 +165,18 @@ func (p *parser) initScannedBlock() error {
 // it starts from the last scanned blocked to the current block
 // for each block, it filters out transactions done by subscribed addresses
 // and saves them in the datastore.
-func (p *parser) querySubscribedAddressTransactions(ctx context.Context) {
-	currentBlock, err := p.getLatestBlock()
+func (p *Parser) querySubscribedAddressTransactions(ctx context.Context) {
+	latestBlockNumber, err := p.getLatestBlockNumber()
 	if err != nil {
-		slog.Error(fmt.Sprintf("error getting latest block: %v", err))
+		p.logger.Error(fmt.Sprintf("error getting latest block: %v", err))
 		return
 	}
 
-	for blockNumber := p.lastScannedBlock.Load() + 1; blockNumber <= currentBlock; blockNumber++ {
+	// start scanning from the last scanned block to the latest block on the blockchain.
+	for blockNumber := p.lastScannedBlock.Load() + 1; blockNumber <= latestBlockNumber; blockNumber++ {
 		select {
 		case <-ctx.Done():
-			slog.Info(fmt.Sprintf("scanning block %d stopped", blockNumber))
+			p.logger.Info(fmt.Sprintf("scanning block %d stopped", blockNumber))
 			return
 		default:
 			p.saveSubscribedAddressTransactions(p.getTransactionsInBlock(blockNumber))
@@ -156,21 +186,23 @@ func (p *parser) querySubscribedAddressTransactions(ctx context.Context) {
 }
 
 // saveSubscribedAddressTransactions finds and stores all transaction done by subscribed address.
-func (p *parser) saveSubscribedAddressTransactions(transactions []blockchain.Transaction) {
-	for _, transaction := range transactions {
-		if addr, ok := p.datastore.Get(transaction.From); ok {
-			err := p.datastore.Add(transaction.From, append(addr, transaction))
+func (p *Parser) saveSubscribedAddressTransactions(blockTransactions []blockchain.Transaction) {
+	for _, transaction := range blockTransactions {
+		if _, ok := p.datastore.Get(transaction.From); ok {
+			err := p.datastore.Add(transaction.From, []blockchain.Transaction{transaction})
 			if err != nil {
-				// if this happens we probably want to do some more than logging it.
-				slog.Error(fmt.Sprintf("error storing transaction %s for address %s %v", transaction.String(), addr, err))
+				p.logger.Error(fmt.Sprintf(
+					"error storing transaction %s for address %s %v",
+					transaction.String(), transaction.From, err))
 			}
 		}
 
-		if addr, ok := p.datastore.Get(transaction.To); ok {
-			err := p.datastore.Add(transaction.To, append(addr, transaction))
+		if _, ok := p.datastore.Get(transaction.To); ok {
+			err := p.datastore.Add(transaction.To, []blockchain.Transaction{transaction})
 			if err != nil {
-				// if this happens we probably want to do some more than logging it.
-				slog.Error(fmt.Sprintf("error storing transaction %s for address %s %v", transaction.String(), addr, err))
+				p.logger.Error(fmt.Sprintf(
+					"error storing transaction %s for address %s %v",
+					transaction.String(), transaction.To, err))
 			}
 		}
 	}
@@ -178,7 +210,7 @@ func (p *parser) saveSubscribedAddressTransactions(transactions []blockchain.Tra
 
 // getBlock queries the etheruem blockchain to the block identified by the blockNumber
 // represented in hex.
-func (p *parser) getBlock(blockNumber string) (*blockchain.Block, error) {
+func (p *Parser) getBlock(blockNumber string) (*blockchain.Block, error) {
 	block, err := p.blockchainQuerier.GetBlock(blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block: %w", err)
@@ -188,42 +220,13 @@ func (p *parser) getBlock(blockNumber string) (*blockchain.Block, error) {
 }
 
 // getTransactionsInBlock requires the address and block number.
-func (p *parser) getTransactionsInBlock(blockNumber int64) []blockchain.Transaction {
+func (p *Parser) getTransactionsInBlock(blockNumber int64) []blockchain.Transaction {
 	block, err := p.getBlock(fmt.Sprintf("0x%x", blockNumber))
 	if err != nil {
 		return []blockchain.Transaction{}
 	}
 
 	return block.Transactions
-}
-
-// startBlockScanning runs a task every minute to find inbound/outbound
-// transactions for subscribed address.
-func (p *parser) startBlockScanning(ctx context.Context) { //nolint: contextcheck
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	err := p.initScannedBlock()
-	if err != nil {
-		slog.Error(fmt.Sprintf("could not start block scanning: %v", err))
-		return
-	}
-
-	if p.scanningInterval == 0 {
-		p.scanningInterval = defaultScanningInterval
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("block scanning stopped")
-			return
-		default:
-			time.Sleep(p.scanningInterval)
-			p.querySubscribedAddressTransactions(ctx)
-		}
-	}
 }
 
 // isValidEthereumAddress validates an ethereum address.

@@ -120,10 +120,13 @@ func TestParser(t *testing.T) {
 	}
 
 	t.Run("test parser subscription", func(t *testing.T) {
+		parser := NewBlockParser(WithDataStore(datastore),
+			WithBlockchainQuerier(blockchainQuerier), WithScanningInterval(1*time.Second))
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		parser := NewBlockParser(ctx, datastore, blockchainQuerier, 1*time.Second)
+		parser.StartBlockScanning(ctx)
 
 		time.Sleep(2 * time.Second)
 
@@ -148,10 +151,13 @@ func TestParser(t *testing.T) {
 	})
 
 	t.Run("test parser get transactions", func(t *testing.T) {
+		parser := NewBlockParser(WithDataStore(datastore),
+			WithBlockchainQuerier(blockchainQuerier), WithScanningInterval(1*time.Second))
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		parser := NewBlockParser(ctx, datastore, blockchainQuerier, 1*time.Second)
+		parser.StartBlockScanning(ctx)
 
 		address := blockchainQuerier.Block.Transactions[0].From
 
