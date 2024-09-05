@@ -191,3 +191,39 @@ func TestParserGetTransactions(t *testing.T) {
 		}
 	})
 }
+
+func TestStartBlockScanning(t *testing.T) {
+	t.Run("test start block scanning", func(t *testing.T) {
+		datastore := newMemoryDataStore[blockchain.Transaction]()
+		block := sampleBlock
+
+		blockchainQuerier := &MockBlockchainQuerier{
+			LatestBlock: 0x7b,
+			Block:       &block,
+		}
+
+		parser := NewBlockParser(WithDataStore(datastore),
+			WithBlockchainQuerier(blockchainQuerier), WithScanningInterval(500*time.Millisecond))
+
+		address := blockchainQuerier.Block.Transactions[0].From
+
+		if subscribed := parser.Subscribe(address); !subscribed {
+			t.Errorf("should subscribe address %s; got %v, want true", address, subscribed)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// start scanning the block.
+		parser.StartBlockScanning(ctx)
+
+		time.Sleep(1100 * time.Millisecond)
+
+		// the transactions should be 4.
+		expectedNumTransactions := 4
+
+		if transactions := parser.GetTransactions(address); len(transactions) != expectedNumTransactions {
+			t.Errorf("should get %d transactions but got %d", expectedNumTransactions, len(transactions))
+		}
+	})
+}
