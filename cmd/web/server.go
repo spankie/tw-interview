@@ -24,6 +24,7 @@ type response struct {
 func respond(w http.ResponseWriter, status int, res any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+
 	err := json.NewEncoder(w).Encode(res)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error encoding response: %v", err))
@@ -46,14 +47,14 @@ func newServer(blockParser blockparser.BlockParser) *http.Server {
 	}
 
 	return &http.Server{
-		Addr:         fmt.Sprintf(":%s", port),
+		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 }
 
-func (s *Server) getCurrentBlockNumber(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getCurrentBlockNumber(w http.ResponseWriter, _ *http.Request) {
 	respond(w, http.StatusOK, response{
 		Message: "success",
 		Data:    s.parser.GetCurrentBlock(),
@@ -70,19 +71,20 @@ func (s *Server) getTransactionsByAddress(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (s *Server) subscribeToAddress(w http.ResponseWriter, r *http.Request) {
-	address := r.PathValue("address")
+func (s *Server) subscribeToAddress(responseWriter http.ResponseWriter, request *http.Request) {
+	address := request.PathValue("address")
 	if !s.parser.Subscribe(address) {
-		respond(w, http.StatusBadRequest, response{
+		respond(responseWriter, http.StatusBadRequest, response{
 			Message: "",
 			Data:    "",
 			Error:   "address could not be subscribed",
 		})
+
 		return
 	}
 
-	respond(w, http.StatusOK, response{
-		Message: fmt.Sprintf("Subscribed to address: %s", address),
+	respond(responseWriter, http.StatusOK, response{
+		Message: "Subscribed to address: " + address,
 		Data:    "",
 		Error:   "",
 	})

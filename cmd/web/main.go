@@ -30,6 +30,7 @@ func gracefulShutdown(ctx context.Context, apiServer *http.Server) {
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
 	if err := apiServer.Shutdown(ctx); err != nil {
 		slog.Error(fmt.Sprintf("Server force to shutdown: %v", err))
 	}
@@ -39,6 +40,7 @@ func gracefulShutdown(ctx context.Context, apiServer *http.Server) {
 
 func configureLogger(logLevel string) error {
 	var level slog.Level
+
 	err := level.UnmarshalText([]byte(logLevel))
 	if err != nil {
 		return fmt.Errorf("error setting log level: %w", err)
@@ -55,7 +57,8 @@ func configureLogger(logLevel string) error {
 
 func run(ctx context.Context, apiServer *http.Server) {
 	go func() {
-		slog.Info(fmt.Sprintf("server listening on port %s", apiServer.Addr))
+		slog.Info("server listening on port " + apiServer.Addr)
+
 		err := apiServer.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error(fmt.Sprintf("HTTP server error: %v", err))

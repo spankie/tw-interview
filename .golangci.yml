@@ -6,7 +6,7 @@ run:
   issues-exit-code: 1
   # Include test files or not.
   tests: true
-  go: '1.20'
+  go: '1.23.0'
 
 linters:
   # Enable specific linters
@@ -29,12 +29,27 @@ linters:
     - usestdlibvars
     - unconvert
     - thelper
+    - funlen
+    - godot
+    - godox
+    - gofumpt
+    - lll
+    - wsl
+    - revive
+    - wrapcheck
+    - perfsprint
+    - varnamelen
 
 linters-settings:
   cyclop:
     # The maximal code complexity to report.
     # Default: 10
     max-complexity: 11
+  funlen:
+    # The maximal function length to report.
+    # Default: 30
+    max-func-len: 100
+
 
 issues:
   # List of regexps of issue texts to exclude.

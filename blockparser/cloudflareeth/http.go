@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+const (
+	defaultTimeout = 10 * time.Second
+)
+
 type rpcRequestBody struct {
 	ID      int    `json:"id"`
 	Jsonrpc string `json:"jsonrpc"`
@@ -15,10 +19,10 @@ type rpcRequestBody struct {
 	Params  []any  `json:"params"`
 }
 
-// TODO: use generics for the result type
+// TODO: use generics for the result type.
 type response struct {
 	ID      int    `json:"id"`
-	JsonRpc string `json:"jsonrpc"`
+	JSONRPC string `json:"jsonrpc"`
 	Result  any    `json:"result"`
 }
 
@@ -31,10 +35,11 @@ type client struct {
 	httpClient http.Client
 }
 
-// newHTTPClient creates a new http client with a base url
+// newHTTPClient creates a new http client with a base url.
 func newHTTPClient(baseURL string) httpClient {
 	c := *http.DefaultClient
-	c.Timeout = 10 * time.Second
+	c.Timeout = defaultTimeout
+
 	return client{baseURL: baseURL, httpClient: c}
 }
 
@@ -50,13 +55,14 @@ func (c client) doRequest(method, url string, body rpcRequestBody, dataRes any) 
 
 	req, err := http.NewRequest(method, fmt.Sprintf("%s/%s", c.baseURL, url), bytes.NewReader(dataBytes))
 	if err != nil {
-		return fmt.Errorf("error occured during request creation: %w", err)
+		return fmt.Errorf("error occurred during request creation: %w", err)
 	}
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error sending request: %w", err)
 	}
+	defer res.Body.Close()
 
 	err = json.NewDecoder(res.Body).Decode(dataRes)
 	if err != nil {

@@ -1,66 +1,71 @@
 package cloudflareeth
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spankie/tw-interview/blockparser/blockchain"
+)
+
+var (
+	ErrInvalidBlockResponse = errors.New("invalid block response")
 )
 
 const (
 	ethBlockNumberMethod      = "eth_blockNumber"
 	ethGetBlockByNumberMethod = "eth_getBlockByNumber"
 
-	cloudFlareBaseUrl = "https://cloudflare-eth.com"
+	cloudFlareBaseURL = "https://cloudflare-eth.com"
 )
 
-// TODO: maybe rename this type
-type cloudflareEth struct {
+type Client struct {
 	client         httpClient
-	jsonRpcVersion string
+	jsonRPCVersion string
 }
 
-// NewCloudflareEth creates a new cloudflare eth client
-func NewCloudflareEth() *cloudflareEth {
-	return &cloudflareEth{
-		client:         newHTTPClient(cloudFlareBaseUrl),
-		jsonRpcVersion: "2.0",
+// NewCloudflareEthClient creates a new cloudflare eth client.
+func NewCloudflareEthClient() *Client {
+	return &Client{
+		client:         newHTTPClient(cloudFlareBaseURL),
+		jsonRPCVersion: "2.0",
 	}
 }
 
-func (c cloudflareEth) GetLatestBlock() (string, error) {
+func (c Client) GetLatestBlock() (string, error) {
 	requestBody := rpcRequestBody{
-		Jsonrpc: c.jsonRpcVersion,
+		Jsonrpc: c.jsonRPCVersion,
 		Method:  ethBlockNumberMethod,
 		Params:  []any{},
 		ID:      83,
 	}
 
-	res := &response{}
+	var res response
 
-	err := c.client.Post("", requestBody, res)
+	err := c.client.Post("", requestBody, &res)
 	if err != nil {
 		return "", fmt.Errorf("error making post request: %w", err)
 	}
 
 	blockNumberStr, ok := res.Result.(string)
 	if !ok {
-		return "", fmt.Errorf("get block response is invalid")
+		return "", ErrInvalidBlockResponse
 	}
 
 	return blockNumberStr, nil
 }
 
 // getBlock queries the etheruem blockchain to the block identified by the blockNumber
-// represented in hex
-func (c cloudflareEth) GetBlock(blockNumber string) (*blockchain.Block, error) {
+// represented in hex.
+func (c Client) GetBlock(blockNumber string) (*blockchain.Block, error) {
 	rpcReq := rpcRequestBody{
-		Jsonrpc: c.jsonRpcVersion,
+		Jsonrpc: c.jsonRPCVersion,
 		Method:  ethGetBlockByNumberMethod,
 		Params:  []any{blockNumber, true},
 		ID:      1,
 	}
 
 	res := &response{Result: &blockchain.Block{}}
+
 	err := c.client.Post("", rpcReq, res)
 	if err != nil {
 		return nil, fmt.Errorf("http error getting block #%s: %w", blockNumber, err)

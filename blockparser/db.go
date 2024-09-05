@@ -1,19 +1,19 @@
 package blockparser
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"sync"
 )
 
-var InvalidKeyError = fmt.Errorf("invalid key")
+var ErrInvalidKey = errors.New("invalid key")
 
-// TODO: make the value type an interface that can be validated
+// TODO: make the value type an interface that can be validated.
 type memoryStore[T any] struct {
 	mu sync.RWMutex
 
 	// NOTE: sync.Map is not used because from the documentation,
-	// this usecase does not require it
+	// this usecase does not require it.
 	data map[string][]T
 }
 
@@ -25,7 +25,7 @@ func newMemoryDataStore[T any]() *memoryStore[T] {
 
 func (s *memoryStore[T]) Add(key string, value []T) error {
 	if strings.TrimSpace(key) == "" {
-		return InvalidKeyError
+		return ErrInvalidKey
 	}
 
 	s.mu.Lock()
@@ -35,7 +35,9 @@ func (s *memoryStore[T]) Add(key string, value []T) error {
 		s.data[key] = value
 		return nil
 	}
+
 	s.data[key] = append(s.data[key], value...)
+
 	return nil
 }
 
@@ -44,5 +46,6 @@ func (s *memoryStore[T]) Get(key string) ([]T, bool) {
 	defer s.mu.RUnlock()
 
 	item, ok := s.data[key]
+
 	return item, ok
 }

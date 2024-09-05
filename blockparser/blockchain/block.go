@@ -1,6 +1,6 @@
 package blockchain
 
-// Block represents a block in the blockchain
+// Block represents a block in the blockchain.
 type Block struct {
 	Difficulty       string        `json:"difficulty"`
 	ExtraData        string        `json:"extraData"`

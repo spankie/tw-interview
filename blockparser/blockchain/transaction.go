@@ -1,11 +1,11 @@
 package blockchain
 
 import (
-	"fmt"
 	"math/big"
+	"strconv"
 )
 
-// Transaction represents a transaction in a block
+// Transaction represents a transaction in a block.
 type Transaction struct {
 	BlockHash        string `json:"blockHash"`
 	BlockNumber      string `json:"blockNumber"`
@@ -24,14 +24,16 @@ type Transaction struct {
 }
 
 func (t Transaction) String() string {
-	return fmt.Sprintf("%d", ConvertHexToInt(t.Nonce))
+	return strconv.FormatInt(ConvertHexToInt(t.Nonce), 10)
 }
 
 func ConvertHexToInt(hex string) int64 {
-	n := new(big.Int)
-	n, ok := n.SetString(hex, 0)
+	bigNumber := new(big.Int)
+
+	bigNumber, ok := bigNumber.SetString(hex, 0)
 	if !ok {
 		return 0
 	}
-	return n.Int64()
+
+	return bigNumber.Int64()
 }

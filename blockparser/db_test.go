@@ -68,38 +68,51 @@ func TestSetAndGet(t *testing.T) {
 	}
 
 	t.Run("test add", func(t *testing.T) {
-		store.Add("testKey", transactions[:1])
+		err := store.Add("testKey", transactions[:1])
+		if err != nil {
+			t.Errorf("expected nil err, got: %v", err)
+		}
 
 		gotTransactions, ok := store.Get("testKey")
 		if !ok {
 			t.Errorf("Get() = _, %v, want _, true", ok)
 		}
+
 		if gotTransactions == nil {
 			t.Errorf("Get() = nil, want non-nil")
 		}
+
 		expectedNumTransactions := 1
+
 		if len(gotTransactions) != expectedNumTransactions {
 			t.Errorf("len(Get()) = %v, want %d", len(gotTransactions), expectedNumTransactions)
 		}
+
 		if gotTransactions[0].From != transactions[0].From {
 			t.Errorf("From = %v, want %v", gotTransactions[0].From, transactions[0].From)
 		}
 	})
 
 	t.Run("test append", func(t *testing.T) {
-		store.Add("testKey", transactions[1:2])
+		err := store.Add("testKey", transactions[1:2])
+		if err != nil {
+			t.Errorf("expected nil err, got: %v", err)
+		}
 
 		gotTransactions, ok := store.Get("testKey")
 		if !ok {
 			t.Errorf("Get() = _, %v, want _, true", ok)
 		}
+
 		if gotTransactions == nil {
 			t.Errorf("Get() = nil, want non-nil")
 		}
+
 		expectedNumTransactions := 2
 		if len(gotTransactions) != expectedNumTransactions {
 			t.Errorf("len(Get()) = %v, want %d", len(gotTransactions), expectedNumTransactions)
 		}
+
 		if gotTransactions[1].From != transactions[1].From {
 			t.Errorf("From = %v, want %v", gotTransactions[1].From, transactions[1].From)
 		}
