@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultScanningInterval = 5 * time.Second
+	defaultScanningInterval = 1 * time.Minute
 )
 
 type ConfigOptionResolver func(*Config)
