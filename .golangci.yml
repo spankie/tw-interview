@@ -29,7 +29,6 @@ linters:
     - usestdlibvars
     - unconvert
     - thelper
-    - funlen
     - godot
     - godox
     - gofumpt
