@@ -21,9 +21,8 @@ func (m *MockBlockchainQuerier) GetLatestBlock() (string, error) {
 		return "", m.LatestBlockErr
 	}
 
-	latestBlock := m.LatestBlock
-
 	m.LatestBlock++
+	latestBlock := m.LatestBlock
 
 	return strconv.Itoa(latestBlock), nil
 }
@@ -123,17 +122,6 @@ func TestParser(t *testing.T) {
 		parser := NewBlockParser(WithDataStore(datastore),
 			WithBlockchainQuerier(blockchainQuerier), WithScanningInterval(1*time.Second))
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		parser.StartBlockScanning(ctx)
-
-		time.Sleep(2 * time.Second)
-
-		if currentBlockNumber := parser.GetCurrentBlock(); currentBlockNumber < 124 {
-			t.Errorf("GetCurrentBlock() = %v, want > 124", currentBlockNumber)
-		}
-
 		// invalid address
 		invalidAddr := "0xabc"
 		if ok := parser.Subscribe(invalidAddr); ok {
@@ -148,16 +136,16 @@ func TestParser(t *testing.T) {
 		if ok := parser.Subscribe(addr1); ok {
 			t.Errorf("should not subscribe an already subscribed address. got %v, want false", ok)
 		}
+
+		transactions := parser.GetTransactions(addr1)
+		if len(transactions) != 0 {
+			t.Errorf("should not have any transactions for address %s. got %d, want 0", addr1, len(transactions))
+		}
 	})
 
 	t.Run("test parser get transactions", func(t *testing.T) {
 		parser := NewBlockParser(WithDataStore(datastore),
 			WithBlockchainQuerier(blockchainQuerier), WithScanningInterval(1*time.Second))
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		parser.StartBlockScanning(ctx)
 
 		address := blockchainQuerier.Block.Transactions[0].From
 
@@ -165,10 +153,29 @@ func TestParser(t *testing.T) {
 			t.Errorf("should subscribe address %s; got %v, want true", address, subscribed)
 		}
 
-		time.Sleep(2 * time.Second)
+		// initialize the scanned block.
+		err := parser.initScannedBlockNumber()
+		if err != nil {
+			t.Errorf("initScannedBlockNumber() = %v, want nil error", err)
+		}
 
-		if transactions := parser.GetTransactions(address); len(transactions) < 2 {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// query the block to find transaction for subscribed address.
+		parser.querySubscribedAddressTransactions(ctx)
+
+		// the transactions should be two.
+		if transactions := parser.GetTransactions(address); len(transactions) != 2 {
 			t.Errorf("should get 2 transactions but got %d", len(transactions))
+		}
+
+		// try to query the same block again and make sure the transactions are not duplicated.
+		blockchainQuerier.LatestBlock--
+		parser.querySubscribedAddressTransactions(ctx)
+
+		if transactions := parser.GetTransactions(address); len(transactions) != 2 {
+			t.Errorf("should get 2 transactions, but got: %v", len(transactions))
 		}
 	})
 }
