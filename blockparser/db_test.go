@@ -3,7 +3,7 @@ package blockparser
 import (
 	"testing"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
+	"github.com/spankie/tw-interview/blockchain"
 )
 
 func TestNewDataStore(t *testing.T) {

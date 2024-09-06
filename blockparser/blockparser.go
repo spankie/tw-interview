@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
+	"github.com/spankie/tw-interview/blockchain"
 )
 
 // Logger is an interface for logging.

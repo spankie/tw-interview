@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
+	"github.com/spankie/tw-interview/blockchain"
 )
 
 type MockBlockchainQuerier struct {

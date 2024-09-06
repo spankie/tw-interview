@@ -90,6 +90,11 @@ with the Ethereum blockchain using the cloudflare eth api. The cloudflare eth ap
 an sdk that implements the `BlockchainQuerier` interface used by the `blockparser`. The `blockparser`
 also uses a datastore to store the subscribed addresses and their transactions.
 
+The source files for blockparser package are in the same folder because they are really small and related
+to each other. The `blockparser.go` file contains the implementation of the `Parser` interface and the
+`blockparser_test.go` file contains the tests for the parser. The `db.go` file contains the implementation
+of the default datastore used by the parser and the `db_test.go` file contains the tests for the datastore.
+
 The blockparser works by polling the cloudflare eth api at regular intervals to get the latest block
 number and filtering transaction in each block from the last scanned block to the latest block.
 The transactions that match any of the subscribed addresses are stored in the datastore identified

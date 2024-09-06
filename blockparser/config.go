@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
-	"github.com/spankie/tw-interview/blockparser/cloudflareeth"
+	"github.com/spankie/tw-interview/blockchain"
+	"github.com/spankie/tw-interview/cloudflareeth"
 )
 
 const (

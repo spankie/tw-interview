@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
+	"github.com/spankie/tw-interview/blockchain"
 )
 
 // StartBlockScanning runs a task every minute to find inbound/outbound

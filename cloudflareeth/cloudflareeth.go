@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/spankie/tw-interview/blockparser/blockchain"
+	"github.com/spankie/tw-interview/blockchain"
 )
 
 var ErrInvalidBlockResponse = errors.New("invalid block response")
